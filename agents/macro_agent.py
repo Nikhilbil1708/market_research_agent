@@ -17,7 +17,7 @@ def macro_node(state: MarketResearchState) -> dict:
     )
     context = "\n\n".join(r["content"] for r in results)
 
-    prompt = f"""You are a JPMC macro strategist.
+    prompt = f"""You are a macro strategist analyzing market conditions.
 Summarize the macroeconomic and sector environment relevant to {ticker}.
 
 Context:

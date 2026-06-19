@@ -27,7 +27,7 @@ def financial_analysis_node(state: MarketResearchState) -> dict:
     ticker = state["ticker"]
     sec_summary = fetch_sec_summary(ticker)
 
-    prompt = f"""You are a JPMC financial analyst.
+    prompt = f"""You are a financial analyst.
 Analyze the financial position of {ticker}.
 
 Recent SEC filings:

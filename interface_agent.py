@@ -102,39 +102,52 @@ def handle_edit(intent: dict) -> dict:
     return intent
 
 
-def run_interface():
-    print("\n" + "="*60)
-    print("BFSI MARKET RESEARCH SYSTEM")
-    print("Scraping · RAG · Multi-Agent Research · PDF Reports")
-    print("="*60)
-    print("Type a plain English research instruction.")
-    print("Type 'quit' to exit.\n")
+def try_python_only_resolution(user_instruction: str) -> dict | None:
+    """
+    Attempts to resolve company name, ticker, and query using pure
+    Python dictionary matching - zero LLM tokens. Returns None if
+    no known company is found in the instruction, signaling the
+    caller to fall back to the LLM extractor.
+    """
+    lookup = user_instruction.lower()
 
+    for key, ticker in BFSI_TICKERS.items():
+        if key in lookup:
+            return {
+                "company_name": key.title(),
+                "ticker": ticker,
+                "query": user_instruction.strip(),
+                "sector": "Banking"
+            }
+
+    return None
+
+
+def run_interface():
+    ...
     while True:
         user_input = input("Research instruction: ").strip()
+        ...
+        # Step 1 — Try pure Python resolution first, zero tokens
+        intent = try_python_only_resolution(user_input)
 
-        if user_input.lower() in ("quit", "exit", "q"):
-            print("Exiting. Goodbye.")
-            break
+        if intent is None:
+            # Step 1b — Fall back to LLM only if Python couldn't resolve it
+            print("\nExtracting research intent...")
+            intent = extract_research_intent(user_input)
 
-        if not user_input:
-            continue
+            if intent["company_name"] == "UNCLEAR":
+                print("Could not identify a company. Please mention the company name.\n")
+                continue
 
-        # Step 1 — Extract intent
-        print("\nExtracting research intent...")
-        intent = extract_research_intent(user_input)
+            intent["ticker"] = resolve_ticker(
+                intent["company_name"],
+                intent.get("ticker", "")
+            )
+        else:
+            print(f"\nResolved directly: {intent['company_name']} ({intent['ticker']}) — no LLM call needed")
 
-        if intent["company_name"] == "UNCLEAR":
-            print("Could not identify a company. Please mention the company name.\n")
-            continue
-
-        # Step 2 — Resolve ticker
-        intent["ticker"] = resolve_ticker(
-            intent["company_name"],
-            intent.get("ticker", "")
-        )
-
-        # Step 3 — Confirm
+        # Step 2 — Confirm
         decision = confirm_with_user(intent)
 
         if decision == "no":
@@ -146,7 +159,7 @@ def run_interface():
             if input("Proceed? (yes/no): ").strip().lower() != "yes":
                 continue
 
-        # Step 4 — Run full pipeline
+        # Step 3 — Run full pipeline
         from pipeline import run_full_pipeline
 
         try:

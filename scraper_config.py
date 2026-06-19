@@ -7,10 +7,10 @@ DOCUMENT_TYPES = {
     "10-K":                    True,   # Annual reports
     "10-Q":                    True,   # Quarterly reports
     "earnings_presentation":   True,   # Earnings slides
-    "earnings_press_release":  False,  # Press releases
+    "earnings_press_release":  True,  # Press releases
     "investor_day":            True,   # Investor day presentations
     "proxy_statement":         False,  # DEF 14A — governance docs
-    "8-K":                     False,  # Current reports
+    "8-K":                     True,  # Current reports
     "supplement":              False,  # Financial supplements
 }
 

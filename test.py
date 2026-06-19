@@ -5,7 +5,7 @@ from state import MarketResearchState
 from agents.news_agent import news_node
 
 state = MarketResearchState(
-    query="JPMorgan Q1 2025 earnings",
+    query="JPMorgan Q1 2026 earnings",
     ticker="JPM",
     messages=[], news_analysis="", financial_data="",
     macro_context="", rag_context="", final_report="",

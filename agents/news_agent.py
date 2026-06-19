@@ -1,7 +1,3 @@
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from langchain_anthropic import ChatAnthropic
 from langchain_community.tools.tavily_search import TavilySearchResults
 from state import MarketResearchState
@@ -18,17 +14,30 @@ def news_node(state: MarketResearchState) -> dict:
         f"Source: {r['url']}\n{r['content']}" for r in results
     )
 
-    prompt = f"""You are a JPMC market research analyst.
-Summarize recent news about {ticker} for this question: "{query}"
+    prompt = f"""Company: {ticker}
+Research question: {query}
 
-Articles:
-{articles}
+From the articles below, extract only what is explicitly stated.
+No commentary, no context, no caveats.
 
-Provide:
-1. Key developments (facts only, no sentiment labels)
-2. Notable management or analyst statements
-3. Regulatory or macro events mentioned
-4. Areas where news coverage is thin
+NEWS ARTICLES:
+{news_articles}
+
+COMPANY OVERVIEW MATERIAL:
+{overview_articles}
+
+Output in exactly this format, nothing else:
+
+COMPANY OVERVIEW:
+[2 sentences maximum: what the company does and its main business segments]
+
+RECENT NEWS:
+[maximum 4 bullets, one sentence each, 20 words max per bullet]
+[skip this section entirely if no relevant news found]
+
+IMPORTANT EVENTS:
+[maximum 2 bullets: regulatory actions or management changes only]
+[skip if none found]
 """
     result = llm.invoke(prompt)
     return {

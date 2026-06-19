@@ -8,28 +8,42 @@ import re
 
 llm = ChatAnthropic(model="claude-opus-4-6", temperature=0)
 
-def extract_confidence(text: str) -> float:
-    match = re.search(r"confidence[:\s]+([0-9.]+)", text, re.IGNORECASE)
-    return float(match.group(1)) if match else 0.75
+def calculate_confidence_score(state: dict) -> float:
+    """
+    Pure Python confidence calculation based on concrete signals -
+    no LLM call needed, no hallucinated number.
+    """
+    score = 0.4   # baseline
+
+    financial_data = state.get("financial_data", "") or ""
+    if financial_data and "not available" not in financial_data.lower():
+        score += 0.15
+
+    if len(state.get("sources", [])) >= 5:
+        score += 0.15
+    elif len(state.get("sources", [])) >= 2:
+        score += 0.08
+
+    if state.get("rag_context"):
+        score += 0.15
+
+    if state.get("company_pe") is not None:
+        score += 0.10
+
+    metrics = state.get("financial_metrics", {})
+    if metrics and any(v for v in metrics.get("revenue", []) if v is not None):
+        score += 0.05
+
+    return min(round(score, 2), 1.0)
 
 def synthesis_node(state: MarketResearchState) -> dict:
-    prompt = f"""You are a senior JPMC market analyst.
-Synthesize this research into a structured report.
-
-News & Developments: {state['news_analysis']}
-Financial Analysis:  {state['financial_data']}
-Macro Context:       {state['macro_context']}
-Retrieved Context:   {state['rag_context']}
-
-Output format:
-1. Executive summary (2-3 sentences)
-2. Key findings with evidence
-3. Risk factors
-4. Data confidence score (0.0 to 1.0)
-5. Sources cited
-"""
+    prompt = f"""...
+    [REMOVE the confidence score instruction line from the prompt entirely -
+    do not ask the LLM to produce a confidence number anymore]
+    ...
+    """
     result = llm.invoke(prompt)
     return {
         "final_report": result.content,
-        "confidence_score": extract_confidence(result.content)
+        "confidence_score": calculate_confidence_score(state)   # ← computed in Python
     }

@@ -4,7 +4,7 @@ load_dotenv()
 from graph import build_graph
 from rag.ingestion import ingest_documents
 from rag.vector_store import build_vector_store
-
+from pdf_generator import generate_pdf 
 def setup_rag():
     sources = [
         # Core Financials

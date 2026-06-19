@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from dotenv import load_dotenv
@@ -37,32 +38,42 @@ def get_indexed_sources() -> set:
         return set()
 
 
-def index_new_documents(company_name: str) -> int:
-    """
-    Finds all PDFs in data\ that belong to this company
-    and indexes only the ones not already in the vector store.
-    Returns the number of new chunks indexed.
-    """
+def index_new_documents(company_name: str, ticker: str = "") -> int:
     from rag.ingestion import ingest_documents
     from rag.vector_store import load_vector_store, build_vector_store
 
-    safe_company = company_name.lower().replace(" ", "_")
-
-    # Find all PDFs for this company in data\
     all_pdfs = glob.glob(os.path.join(DOWNLOAD_DIR, "*.pdf"))
-    company_pdfs = [
-        p for p in all_pdfs
-        if safe_company in os.path.basename(p).lower()
-        or company_name.lower().split()[0] in os.path.basename(p).lower()
+
+    # Build match terms — ticker is most reliable, name parts as fallback
+    match_terms = []
+
+    if ticker:
+        match_terms.append(ticker.lower())
+
+    name_clean = re.sub(r"[^a-z0-9\s]", "", company_name.lower())
+    name_parts = [
+        w for w in name_clean.split()
+        if w not in ("the", "inc", "corp", "group", "co", "ltd", "llc", "plc")
+        and len(w) > 3
     ]
+    match_terms.extend(name_parts)
+
+    def matches_company(filepath: str) -> bool:
+        basename = os.path.basename(filepath).lower()
+        return any(term in basename for term in match_terms)
+
+    company_pdfs = [p for p in all_pdfs if matches_company(p)]
 
     if not company_pdfs:
-        print(f"  [RAG] No PDFs found for {company_name} in {DOWNLOAD_DIR}\\")
+        print(f"  [RAG] No PDFs found for {company_name} ({ticker})")
+        print(f"  [RAG] Match terms used: {match_terms}")
+        print(f"  [RAG] All files in data folder:")
+        for f in all_pdfs:
+            print(f"        - {os.path.basename(f)}")
         return 0
 
-    # Filter out already-indexed files
     already_indexed = get_indexed_sources()
-    new_pdfs = [p for p in company_pdfs if p not in already_indexed]
+    new_pdfs        = [p for p in company_pdfs if p not in already_indexed]
 
     if not new_pdfs:
         print(f"  [RAG] All {len(company_pdfs)} PDFs for {company_name} already indexed")
@@ -74,23 +85,19 @@ def index_new_documents(company_name: str) -> int:
 
     docs = ingest_documents(new_pdfs)
 
-    # Add to existing vector store if it exists, else create new
     if os.path.exists(PERSIST_DIR):
         vs = load_vector_store()
         vs.add_documents(docs)
     else:
         build_vector_store(docs)
 
-    print(f"  [RAG] Indexed {len(docs)} chunks successfully")
+    print(f"  [RAG] Indexed {len(docs)} chunks")
     return len(docs)
+   
 
 
 def run_scraper_for_company(company_name: str) -> bool:
-    """
-    Runs the scraper agent for a specific company.
-    Returns True if at least one file was downloaded.
-    """
-    from scraper_agent import agent_executor
+    from scraper_agent import invoke_scraper
 
     instruction = (
         f"Download the latest annual report (10-K), "
@@ -100,23 +107,28 @@ def run_scraper_for_company(company_name: str) -> bool:
     )
 
     print(f"\n  [Scraper] Starting download for {company_name}...")
-
-    # Count files before
     before = set(glob.glob(os.path.join(DOWNLOAD_DIR, "*.pdf")))
 
     try:
-        result = agent_executor.invoke({"input": instruction})
-        print(f"  [Scraper] {result['output']}")
-    except Exception as e:
-        print(f"  [Scraper] Error: {e}")
+        response = invoke_scraper(instruction)
+        print(f"  [Scraper] Agent response: {response}")
+    except Exception as scraper_error:
+        print(f"  [Scraper] FAILED: {scraper_error}")
+        import traceback
+        traceback.print_exc()
+        return False
 
-    # Count files after
-    after = set(glob.glob(os.path.join(DOWNLOAD_DIR, "*.pdf")))
+    after     = set(glob.glob(os.path.join(DOWNLOAD_DIR, "*.pdf")))
     new_files = after - before
 
-    print(f"  [Scraper] Downloaded {len(new_files)} new file(s)")
-    return len(new_files) > 0
+    if new_files:
+        print(f"  [Scraper] Downloaded {len(new_files)} new file(s):")
+        for f in new_files:
+            print(f"            - {os.path.basename(f)}")
+    else:
+        print("  [Scraper] WARNING: No new files downloaded")
 
+    return len(new_files) > 0
 
 def run_research(intent: dict) -> dict:
     """
@@ -159,6 +171,7 @@ def run_full_pipeline(intent: dict) -> str:
     company = intent["company_name"]
     ticker  = intent["ticker"]
     query   = intent["query"]
+    chunks_added = index_new_documents(company, ticker)
 
     print("\n" + "="*60)
     print(f"PIPELINE STARTING: {company} ({ticker})")
@@ -166,35 +179,78 @@ def run_full_pipeline(intent: dict) -> str:
 
     # ── Stage 1: Scrape ──────────────────────────────────────────
     print("\n[Stage 1/4] Scraping financial documents...")
-    run_scraper_for_company(company)
+    scrape_success = False
+
+    try:
+        scrape_success = run_scraper_for_company(company)
+    except Exception as scrape_error:
+        print(f" [Scraper] ERROR: {scrape_error}")
+        import traceback
+        traceback.print_exc()
+        scrape_success = False
+
+    if not scrape_success: 
+        print("\n  [WARNING] No documents were downloaded.")
+        print("  [WARNING] RAG will use existing vector store only.")
+        print("  [WARNING] Research quality may be limited.")
+        print("  [WARNING] To manually add documents:")
+        print(f"            1. Download PDFs from the company IR page")
+        print(f"            2. Save them to: {os.path.abspath(DOWNLOAD_DIR)}")
+        print(f"            3. Run: python main.py")
+        user_choice = input("\n  Continue with existing data? (yes/no): ").strip().lower()
+        if user_choice != "yes":
+            raise Exception("Pipeline cancelled by user — no documents downloaded")
 
     # ── Stage 2: Index ───────────────────────────────────────────
     print("\n[Stage 2/4] Indexing new documents into RAG...")
-    chunks_added = index_new_documents(company)
+    chunks_added = 0                                # ← defined before try block
+
+    try:
+        chunks_added = index_new_documents(company)
+    except Exception as index_error:               # ← named index_error not e
+        print(f"  [RAG] Indexing error: {index_error}")
+        import traceback
+        traceback.print_exc()
+
     if chunks_added == 0:
         print("  [RAG] Proceeding with existing vector store")
 
     # ── Stage 3: Research ────────────────────────────────────────
     print("\n[Stage 3/4] Running research agents...")
-    result = run_research(intent)
+    result = {}                                     # ← defined before try block
+
+    try:
+        result = run_research(intent)
+    except Exception as research_error:            # ← named research_error not e
+        print(f"  [Research] FAILED: {research_error}")
+        import traceback
+        traceback.print_exc()
+        raise
 
     print("\n" + "-"*60)
     print("RESEARCH REPORT")
     print("-"*60)
     print(result["final_report"])
-    print(f"\nConfidence Score : {result['confidence_score']:.2f}")
-    print(f"Sources cited    : {len(result['sources'])}")
+    print(f"\nConfidence Score : {result.get('confidence_score', 0.0):.2f}")
+    print(f"Sources cited    : {len(result.get('sources', []))}")
 
     # ── Stage 4: Generate PDF ────────────────────────────────────
     print("\n[Stage 4/4] Generating PDF report...")
-    pdf_path = generate_pdf(
-        final_report     = result["final_report"],
-        query            = query,
-        ticker           = ticker,
-        confidence_score = result["confidence_score"],
-        sources          = result["sources"]
-    )
-    print(f"PDF saved: {pdf_path}")
+    pdf_path = ""                                   # ← defined before try block
+
+    try:
+        pdf_path = generate_pdf(
+            final_report     = result["final_report"],
+            query            = query,
+            ticker           = ticker,
+            confidence_score = result.get("confidence_score", 0.0),
+            sources          = result.get("sources", [])
+        )
+        print(f"PDF saved: {pdf_path}")
+    except Exception as pdf_error:                 # ← named pdf_error not e
+        print(f"  [PDF] Generation failed: {pdf_error}")
+        import traceback
+        traceback.print_exc()
 
     print("\n" + "="*60)
     print(f"PIPELINE COMPLETE: {company}")
