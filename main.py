@@ -11,7 +11,7 @@ def setup_rag():
         r"C:\Users\visha\projects\market_research_agent\data\4q25earnings-report.pdf",
         r"C:\Users\visha\projects\market_research_agent\data\corp-q1-2026.pdf",
         r"C:\Users\visha\projects\market_research_agent\data\corp-q2-2025.pdf",
-        r"C:\Users\visha\projects\market_research_agent\data\corp-q3-2025.pdf"
+        r"C:\Users\visha\projects\market_research_agent\data\corp-q3-2025.pdf",
         r"C:\Users\visha\projects\market_research_agent\data\corp-10k-2025.pdf",
     
 

@@ -9,7 +9,7 @@ import re
 import json
 from langchain_anthropic import ChatAnthropic
 
-llm = ChatAnthropic(model="claude-opus-4-6", temperature=0)
+llm = ChatAnthropic(model="claude-haiku-4-5", temperature=0)
 
 BFSI_TICKERS = {
     "jpmorgan":         "JPM",  "jp morgan":      "JPM",

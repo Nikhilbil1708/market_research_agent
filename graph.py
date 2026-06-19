@@ -61,7 +61,7 @@ def build_graph():
 
     g.add_node("router", lambda state: {})   # pass-through node, routing happens in edges
     g.add_node("news_agent", news_node)
-    g.add_node("tech_agent", tech_node)
+    g.add_node("tech_agent", tech_strategy_node)
     g.add_node("financial_agent", financial_analysis_node)
     g.add_node("macro_agent", macro_node)
     g.add_node("rag_agent", rag_retrieval_node)

@@ -2,7 +2,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_community.tools.tavily_search import TavilySearchResults
 from state import MarketResearchState
 
-llm = ChatAnthropic(model="claude-opus-4-6", temperature=0)
+llm = ChatAnthropic(model="claude-haiku-4-5", temperature=0)
 search_tool = TavilySearchResults(max_results=8)
 
 def news_node(state: MarketResearchState) -> dict:
@@ -21,10 +21,7 @@ From the articles below, extract only what is explicitly stated.
 No commentary, no context, no caveats.
 
 NEWS ARTICLES:
-{news_articles}
-
-COMPANY OVERVIEW MATERIAL:
-{overview_articles}
+{articles}
 
 Output in exactly this format, nothing else:
 

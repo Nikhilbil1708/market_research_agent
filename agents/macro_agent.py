@@ -6,7 +6,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_community.tools.tavily_search import TavilySearchResults
 from state import MarketResearchState
 
-llm = ChatAnthropic(model="claude-opus-4-6", temperature=0)
+llm = ChatAnthropic(model="claude-haiku-4-5", temperature=0)
 search_tool = TavilySearchResults(max_results=6)
 
 def macro_node(state: MarketResearchState) -> dict:
@@ -17,17 +17,27 @@ def macro_node(state: MarketResearchState) -> dict:
     )
     context = "\n\n".join(r["content"] for r in results)
 
-    prompt = f"""You are a macro strategist analyzing market conditions.
-Summarize the macroeconomic and sector environment relevant to {ticker}.
+    prompt = f"""Company: {ticker}
 
-Context:
+From the articles below, extract only explicitly stated macro factors.
+No general economic commentary. No caveats or hedging.
+
+ARTICLES:
 {context}
 
-Cover:
-1. Interest rate and Fed policy impact
-2. Sector-level tailwinds and headwinds
-3. GDP, inflation, or employment data relevant to this company
-4. Competitive landscape shifts
+Output in exactly this format:
+
+INTEREST RATES AND FED POLICY:
+[1 bullet, current rate + direct impact on {ticker} only]
+[write "No specific data found" if not mentioned]
+
+SECTOR CONDITIONS:
+[maximum 2 bullets, named sector trends only, 15 words each]
+[write "No specific data found" if not mentioned]
+
+RELEVANT ECONOMIC DATA:
+[maximum 2 bullets, specific named figures only, e.g. GDP 2.1%, CPI 3.2%]
+[write "No specific data found" if not mentioned]
 """
     result = llm.invoke(prompt)
     return {

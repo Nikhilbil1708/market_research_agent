@@ -44,7 +44,7 @@ TICKER_TO_COMPANY = {
 }
 
 # Which synthesised section heading signals the Financial Analysis section
-FINANCIAL_SECTION_PATTERN = re.compile(r"financial\s+analysis", re.IGNORECASE)
+FINANCIAL_SECTION_PATTERN = re.compile(r"financial\s+summary", re.IGNORECASE)
 
 
 def build_styles():

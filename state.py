@@ -9,7 +9,10 @@ class MarketResearchState(TypedDict):
     company_overview_context: str
     tech_strategy_context: str
     financial_data: str
-    financial_charts: List[str]
+    financial_metrics: dict
+    chart_paths: List[str]
+    company_pe: float
+    competitor_pe: dict
     macro_context: str
     rag_context: str
     final_report: str

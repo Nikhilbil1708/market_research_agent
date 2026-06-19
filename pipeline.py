@@ -96,29 +96,28 @@ def index_new_documents(company_name: str, ticker: str = "") -> int:
    
 
 
-def run_scraper_for_company(company_name: str) -> bool:
-    from scraper_agent import invoke_scraper
+def run_scraper_for_company(company_name: str, ticker: str) -> bool:
+    from scraper_agent import scrape_company
 
-    instruction = (
-        f"Download the latest annual report (10-K), "
-        f"the two most recent quarterly reports (10-Q), "
-        f"and the latest earnings presentation for {company_name}. "
-        f"Skip any documents already saved."
+    print(f"\n  [Scraper] Starting download for {company_name} ({ticker})...")
+    before = (
+        set(glob.glob(os.path.join(DOWNLOAD_DIR, "*.pdf"))) |
+        set(glob.glob(os.path.join(DOWNLOAD_DIR, "*.html")))
     )
 
-    print(f"\n  [Scraper] Starting download for {company_name}...")
-    before = set(glob.glob(os.path.join(DOWNLOAD_DIR, "*.pdf")))
-
     try:
-        response = invoke_scraper(instruction)
-        print(f"  [Scraper] Agent response: {response}")
+        response = scrape_company(ticker, company_name)
+        print(f"  [Scraper] Response: {response}")
     except Exception as scraper_error:
         print(f"  [Scraper] FAILED: {scraper_error}")
         import traceback
         traceback.print_exc()
         return False
 
-    after     = set(glob.glob(os.path.join(DOWNLOAD_DIR, "*.pdf")))
+    after = (
+        set(glob.glob(os.path.join(DOWNLOAD_DIR, "*.pdf"))) |
+        set(glob.glob(os.path.join(DOWNLOAD_DIR, "*.html")))
+    )
     new_files = after - before
 
     if new_files:
@@ -182,7 +181,7 @@ def run_full_pipeline(intent: dict) -> str:
     scrape_success = False
 
     try:
-        scrape_success = run_scraper_for_company(company)
+        scrape_success = run_scraper_for_company(company, ticker)
     except Exception as scrape_error:
         print(f" [Scraper] ERROR: {scrape_error}")
         import traceback
@@ -206,7 +205,7 @@ def run_full_pipeline(intent: dict) -> str:
     chunks_added = 0                                # ← defined before try block
 
     try:
-        chunks_added = index_new_documents(company)
+        chunks_added = index_new_documents(company, ticker)
     except Exception as index_error:               # ← named index_error not e
         print(f"  [RAG] Indexing error: {index_error}")
         import traceback
@@ -244,7 +243,8 @@ def run_full_pipeline(intent: dict) -> str:
             query            = query,
             ticker           = ticker,
             confidence_score = result.get("confidence_score", 0.0),
-            sources          = result.get("sources", [])
+            sources          = result.get("sources", []),
+            financial_charts = result.get("chart_paths", [])
         )
         print(f"PDF saved: {pdf_path}")
     except Exception as pdf_error:                 # ← named pdf_error not e
