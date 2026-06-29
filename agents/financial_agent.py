@@ -2,8 +2,8 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from langchain_anthropic import ChatAnthropic
 from state import MarketResearchState
+from llm_factory import get_llm
 import requests
 import json
 import re
@@ -13,11 +13,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-# Cheapest tier - this agent only does structured extraction, not reasoning
-llm = ChatAnthropic(
-    model="claude-haiku-4-5",
-    temperature=0
-)
+llm = get_llm("fast")
 
 CHART_DIR = "charts"
 os.makedirs(CHART_DIR, exist_ok=True)
@@ -90,9 +86,22 @@ def fetch_financial_data_yfinance(ticker: str) -> dict:
                     return None
 
                 revenue = get_value(["Total Revenue", "Operating Revenue"])
-                ebitda  = get_value(["EBITDA", "Normalized EBITDA"])
-                cogs    = get_value(["Cost Of Revenue", "Reconciled Cost Of Revenue"])
-                sga     = get_value(["Selling General And Administration", "SG&A Expense"])
+
+                ebitda = get_value(["EBITDA", "Normalized EBITDA"])
+                if ebitda is None:
+                    # Banks have no direct EBITDA row — derive from Pretax Income + D&A
+                    pretax = get_value(["Pretax Income", "Net Income Before Taxes"])
+                    depn   = get_value(["Reconciled Depreciation", "Depreciation And Amortization", "Depreciation"])
+                    if pretax is not None:
+                        ebitda = round(pretax + (depn or 0), 2)
+
+                # Banks have no COGS; Interest Expense is the cost-of-funding proxy
+                cogs = get_value([
+                    "Cost Of Revenue", "Reconciled Cost Of Revenue",
+                    "Cost Of Goods Sold", "Interest Expense",
+                ])
+
+                sga = get_value(["Selling General And Administration", "SG&A Expense"])
 
                 records.append({
                     "period":  period_label,

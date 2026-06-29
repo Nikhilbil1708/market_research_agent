@@ -1,15 +1,16 @@
-from langchain_anthropic import ChatAnthropic
 from langchain_community.tools.tavily_search import TavilySearchResults
 from state import MarketResearchState
+from llm_factory import get_llm
 
-llm = ChatAnthropic(model="claude-haiku-4-5", temperature=0)
+llm = get_llm("fast")
 search_tool = TavilySearchResults(max_results=8)
 
 def news_node(state: MarketResearchState) -> dict:
     ticker = state["ticker"]
     query = state["query"]
 
-    results = search_tool.invoke(f"{ticker} {query} latest news 2025")
+    search_query = state.get("sub_queries", {}).get("news") or f"{ticker} {query}"
+    results = search_tool.invoke(f"{search_query} latest news 2025")
     articles = "\n\n".join(
         f"Source: {r['url']}\n{r['content']}" for r in results
     )

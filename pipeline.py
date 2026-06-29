@@ -9,6 +9,7 @@ load_dotenv()
 import glob
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from guardrails import run_rag_guardrail, run_output_guardrails
 
 DOWNLOAD_DIR = "data"
 PERSIST_DIR  = "chroma_db"
@@ -142,6 +143,7 @@ def run_research(intent: dict) -> dict:
     result = graph.invoke({
         "query"          : intent["query"],
         "ticker"         : intent["ticker"],
+        "sub_queries"    : {},
         "messages"       : [],
         "news_analysis"  : "",
         "financial_data" : "",
@@ -196,9 +198,7 @@ def run_full_pipeline(intent: dict) -> str:
         print(f"            1. Download PDFs from the company IR page")
         print(f"            2. Save them to: {os.path.abspath(DOWNLOAD_DIR)}")
         print(f"            3. Run: python main.py")
-        user_choice = input("\n  Continue with existing data? (yes/no): ").strip().lower()
-        if user_choice != "yes":
-            raise Exception("Pipeline cancelled by user — no documents downloaded")
+        print("\n  [WARNING] Continuing with existing vector store data.")
 
     # ── Stage 2: Index ───────────────────────────────────────────
     print("\n[Stage 2/4] Indexing new documents into RAG...")
@@ -213,6 +213,8 @@ def run_full_pipeline(intent: dict) -> str:
 
     if chunks_added == 0:
         print("  [RAG] Proceeding with existing vector store")
+
+    run_rag_guardrail(PERSIST_DIR)
 
     # ── Stage 3: Research ────────────────────────────────────────
     print("\n[Stage 3/4] Running research agents...")
@@ -232,6 +234,8 @@ def run_full_pipeline(intent: dict) -> str:
     print(result["final_report"])
     print(f"\nConfidence Score : {result.get('confidence_score', 0.0):.2f}")
     print(f"Sources cited    : {len(result.get('sources', []))}")
+
+    run_output_guardrails(result)
 
     # ── Stage 4: Generate PDF ────────────────────────────────────
     print("\n[Stage 4/4] Generating PDF report...")

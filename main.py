@@ -44,6 +44,7 @@ if __name__ == "__main__":
     result = graph.invoke({
         "query": "What were JPMorgan's key growth drivers and risks in 2025?",
         "ticker": "JPM",
+        "sub_queries": {},
         "messages": [],
         "news_analysis": "",
         "financial_data": "",

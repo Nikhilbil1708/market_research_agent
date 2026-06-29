@@ -2,13 +2,10 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from langchain_anthropic import ChatAnthropic
 from state import MarketResearchState
+from llm_factory import get_llm
 
-llm = ChatAnthropic(
-    model="claude-opus-4-8",
-    temperature=0
-)
+llm = get_llm("powerful")
 
 
 # ── Confidence score — pure Python, zero LLM tokens ───────────────────

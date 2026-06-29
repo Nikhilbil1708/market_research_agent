@@ -2,11 +2,11 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from langchain_anthropic import ChatAnthropic
 from langchain_community.tools.tavily_search import TavilySearchResults
 from state import MarketResearchState
+from llm_factory import get_llm
 
-llm = ChatAnthropic(model="claude-haiku-4-5", temperature=0)
+llm = get_llm("fast")
 search_tool = TavilySearchResults(max_results=8)
 
 
@@ -19,8 +19,9 @@ def _search(query: str) -> tuple[list, str]:
 def tech_strategy_node(state: MarketResearchState) -> dict:
     ticker = state["ticker"]
 
-    r_ai,   t_ai   = _search(f"{ticker} artificial intelligence generative AI machine learning data analytics LLM 2024 2025")
-    r_tech, t_tech = _search(f"{ticker} cloud ISV vendor partnership cybersecurity GCC digital transformation technology 2024 2025")
+    tech_query = state.get("sub_queries", {}).get("tech") or ticker
+    r_ai,   t_ai   = _search(f"{tech_query} artificial intelligence generative AI machine learning LLM 2024 2025")
+    r_tech, t_tech = _search(f"{tech_query} cloud partnership digital transformation cybersecurity 2024 2025")
 
     prompt = f"""Company: {ticker}
 

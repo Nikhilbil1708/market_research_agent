@@ -7,9 +7,10 @@ load_dotenv()
 
 import re
 import json
-from langchain_anthropic import ChatAnthropic
+from llm_factory import get_llm
+from guardrails import run_input_guardrails
 
-llm = ChatAnthropic(model="claude-haiku-4-5", temperature=0)
+llm = get_llm("fast")
 
 BFSI_TICKERS = {
     "jpmorgan":         "JPM",  "jp morgan":      "JPM",
@@ -147,17 +148,21 @@ def run_interface():
         else:
             print(f"\nResolved directly: {intent['company_name']} ({intent['ticker']}) — no LLM call needed")
 
-        # Step 2 — Confirm
-        decision = confirm_with_user(intent)
+        # Step 2 — Show resolved intent
+        print("\n" + "="*60)
+        print("RESEARCH INTENT")
+        print("="*60)
+        print(f"  Company  : {intent['company_name']}")
+        print(f"  Ticker   : {intent['ticker']}")
+        print(f"  Sector   : {intent['sector']}")
+        print(f"  Query    : {intent['query']}")
+        print("="*60)
 
-        if decision == "no":
-            print("Cancelled.\n")
+        # Step 2b — Input guardrails (ticker + query relevance)
+        blocking_ok, _ = run_input_guardrails(intent["ticker"], intent["query"])
+        if not blocking_ok:
+            print("\nIrrelevant query - Can't be done\n")
             continue
-
-        if decision == "edit":
-            intent = handle_edit(intent)
-            if input("Proceed? (yes/no): ").strip().lower() != "yes":
-                continue
 
         # Step 3 — Run full pipeline
         from pipeline import run_full_pipeline

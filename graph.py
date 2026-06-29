@@ -3,6 +3,7 @@ load_dotenv()
 
 from langgraph.graph import StateGraph, END
 from state import MarketResearchState
+from agents.decomposition_agent import decomposition_node
 from agents.news_agent import news_node
 from agents.tech_agent import tech_strategy_node
 from agents.financial_agent import financial_analysis_node
@@ -43,12 +44,15 @@ def route_tasks(state: MarketResearchState) -> list:
     if any(k in query for k in news_keywords):
         tasks.append("news_agent")
 
-    # RAG always runs - it's free (no LLM call) and adds grounding
+    # news_agent and rag_agent always run — news provides the company overview
+    # section which must appear in every report regardless of query topic
+    if "news_agent" not in tasks:
+        tasks.append("news_agent")
     tasks.append("rag_agent")
 
     # If the query is broad/ambiguous and matched nothing specific,
     # run everything rather than risk missing relevant context
-    specific_tasks = [t for t in tasks if t != "rag_agent"]
+    specific_tasks = [t for t in tasks if t not in ("rag_agent", "news_agent")]
     if len(specific_tasks) == 0:
         tasks = ["news_agent", "tech_agent", "financial_agent", "macro_agent", "rag_agent"]
 
@@ -59,6 +63,7 @@ def route_tasks(state: MarketResearchState) -> list:
 def build_graph():
     g = StateGraph(MarketResearchState)
 
+    g.add_node("decomposition", decomposition_node)
     g.add_node("router", lambda state: {})   # pass-through node, routing happens in edges
     g.add_node("news_agent", news_node)
     g.add_node("tech_agent", tech_strategy_node)
@@ -67,7 +72,8 @@ def build_graph():
     g.add_node("rag_agent", rag_retrieval_node)
     g.add_node("synthesis", synthesis_node)
 
-    g.set_entry_point("router")
+    g.set_entry_point("decomposition")
+    g.add_edge("decomposition", "router")
 
     # Conditional fan-out - only selected agents run
     g.add_conditional_edges(

@@ -18,6 +18,9 @@ chroma_db/
 # Reports (generated output)
 reports/
 
+# Generated charts
+charts/
+
 # Data files
 data/
 

@@ -2,19 +2,18 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from langchain_anthropic import ChatAnthropic
 from langchain_community.tools.tavily_search import TavilySearchResults
 from state import MarketResearchState
+from llm_factory import get_llm
 
-llm = ChatAnthropic(model="claude-haiku-4-5", temperature=0)
+llm = get_llm("fast")
 search_tool = TavilySearchResults(max_results=6)
 
 def macro_node(state: MarketResearchState) -> dict:
     ticker = state["ticker"]
 
-    results = search_tool.invoke(
-        f"macroeconomic outlook interest rates sector trends {ticker} 2025"
-    )
+    search_query = state.get("sub_queries", {}).get("macro") or f"macroeconomic outlook interest rates sector trends {ticker} 2025"
+    results = search_tool.invoke(search_query)
     context = "\n\n".join(r["content"] for r in results)
 
     prompt = f"""Company: {ticker}
